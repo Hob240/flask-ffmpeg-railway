@@ -34,14 +34,18 @@ def process_video():
     if not ffmpeg_path:
         ffmpeg_path = "ffmpeg"
 
-    # Jalankan FFmpeg dengan pengaturan agar sulit dideteksi
+    # Jalankan FFmpeg dengan optimasi agar tidak terdeteksi Snapchat
     command = [
         ffmpeg_path, "-y",
         "-i", input_path,
-        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2, noise=alls=10:allf=t, eq=brightness=0.02",
+        "-vf", "scale=1280:720, eq=contrast=1.05:brightness=0.02:saturation=1.1, noise=alls=10:allf=t",  # Modifikasi tampilan sedikit
         "-r", "23.976",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "28",
-        "-c:a", "aac", "-b:a", "128k",
+        "-c:v", "libx265", "-preset", "ultrafast", "-crf", "28",  # Pakai H.265 untuk ubah fingerprint codec
+        "-b:v", "800k",  # Batasi bitrate agar hemat RAM
+        "-c:a", "aac", "-b:a", "96k",
+        "-movflags", "+faststart",
+        "-map_metadata", "-1",  # Hapus metadata bawaan IG
+        "-pix_fmt", "yuv420p",  # Format agar tetap kompatibel di semua platform
         output_path
     ]
 
