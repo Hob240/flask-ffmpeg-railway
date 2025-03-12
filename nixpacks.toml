@@ -1,2 +1,2 @@
 [phases.setup]
-aptPkgs = ["ffmpeg"]
+aptPkgs = ["ffmpeg=7:4.3.6-0+deb11u1"]
