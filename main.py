@@ -49,9 +49,10 @@ def process_video():
         os.remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # Proses video dengan tweak agar sulit dideteksi
+    # Perbaikan: pindahkan "-r 29.97" sebelum "-i"
     command = [
         ffmpeg_path, "-y",
+        "-r", "29.97",  # **Letakkan sebelum "-i" untuk menghindari error**
         "-ss", "1",  # Potong 1 detik awal
         "-i", input_path,
         "-t", str(duration - 1),  # Potong 1 detik akhir
@@ -59,7 +60,6 @@ def process_video():
                "tblend=all_mode=difference128,"
                "eq=contrast=1.02:brightness=0.01:saturation=1.03,"
                "rotate=0.005*sin(2*PI*t/8),"  # Perubahan kecil pada rotasi
-        "-r", "29.97",  # FPS unik agar berbeda
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-crf", "23",
