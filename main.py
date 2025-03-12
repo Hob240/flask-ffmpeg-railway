@@ -10,6 +10,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 app = Flask(__name__)
 
+def safe_remove(file_path):
+    """Menghapus file jika masih ada untuk menghindari error."""
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as e:
+        logging.warning(f"Gagal menghapus {file_path}: {e}")
+
 @app.route("/", methods=["GET"])
 def home():
     return "FFmpeg API is running!"
@@ -46,10 +54,10 @@ def process_video():
         duration = hours * 3600 + minutes * 60 + seconds - 1  # Kurangi 1 detik agar unik
     else:
         logging.error("Gagal mendapatkan durasi video!")
-        os.remove(input_path)
+        safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # Perbaikan: pindahkan "-r 29.97" sebelum "-i"
+    # Perbaikan: Pindahkan "-r 29.97" sebelum "-i"
     command = [
         ffmpeg_path, "-y",
         "-r", "29.97",  # **Letakkan sebelum "-i" untuk menghindari error**
@@ -59,12 +67,12 @@ def process_video():
         "-vf", "minterpolate=mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,"
                "tblend=all_mode=difference128,"
                "eq=contrast=1.02:brightness=0.01:saturation=1.03,"
-               "rotate=0.005*sin(2*PI*t/8),"  # Perubahan kecil pada rotasi
+               "rotate=0.005*sin(2*PI*t/8)",  # Perubahan kecil pada rotasi
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-crf", "23",
         "-b:v", "1600k",
-        "-c:a", "libopus",  # Gunakan format audio Opus
+        "-c:a", "aac",  # Gunakan format audio AAC agar lebih kompatibel
         "-b:a", "128k",
         "-af", "asetrate=44100*1.005, atempo=0.995, volume=1.02",  # Sedikit mengubah tempo & pitch
         "-movflags", "+faststart",
@@ -83,14 +91,15 @@ def process_video():
     logging.error(f"FFmpeg Error:\n{result.stderr}")
 
     if result.returncode != 0 or not os.path.exists(output_path):
-        os.remove(input_path)
+        safe_remove(input_path)
+        safe_remove(output_path)
         return jsonify({"error": "FFmpeg failed!"}), 500
 
     response = send_file(output_path, as_attachment=True)
 
     # Hapus file sementara
-    os.remove(input_path)
-    os.remove(output_path)
+    safe_remove(input_path)
+    safe_remove(output_path)
 
     return response
 
