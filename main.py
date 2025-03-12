@@ -5,9 +5,11 @@ import tempfile
 import re
 from flask import Flask, request, send_file, jsonify
 
+# Konfigurasi logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # Maks 500MB upload
 
 def safe_remove(file_path):
     try:
@@ -53,7 +55,7 @@ def process_video():
         safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # ⚙️ Perintah FFmpeg dengan tambahan proteksi dari deteksi reupload
+    # ⚙️ Perintah FFmpeg dengan proteksi dari deteksi reupload
     command = [
         ffmpeg_path, "-y",
         "-loglevel", "info",
@@ -64,11 +66,12 @@ def process_video():
         "-i", input_path,
         "-t", str(duration - 1),
         
-        # 🎨 Filter visual
+        # 🎨 Filter visual (diperbaiki)
         "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04,"
-               "noise=alls=3:allf=t+u,"  # Noise kecil agar hash berubah
-               "tblend=all_mode=lighten:all_opacity=0.05,"  # Sedikit blur random
-               "drawtext=text=' ':fontsize=30:fontcolor=white@0.03:x=10:y=10",  # Watermark transparan sangat tipis
+               "noise=alls=4:allf=t,"  # Noise lebih dinamis
+               "gblur=sigma=0.3,"  # Blur lebih halus
+               "drawtext=text='\ \ ':fontsize=30:fontcolor=white@0.02:"
+               "x=rand(0\,w-50):y=rand(0\,h-50)",  # Watermark berubah tiap frame
 
         # 🎥 Encoding video
         "-c:v", "libx264",
@@ -78,10 +81,10 @@ def process_video():
         "-b:v", "1200k",
         "-pix_fmt", "yuv420p",
 
-        # 🔊 Audio processing
+        # 🔊 Audio processing (diperbaiki)
         "-c:a", "aac",
         "-b:a", "128k",
-        "-af", "asetrate=44100*1.004, atempo=0.996, volume=1.02",
+        "-af", "rubberband=pitch=1.01,volume=1.02",  # Pitch shift lebih smooth
 
         # 🔄 Sinkronisasi dan optimasi
         "-strict", "-2",
@@ -95,10 +98,17 @@ def process_video():
         output_path
     ]
 
-    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=600)
+    except subprocess.TimeoutExpired:
+        logging.error("FFmpeg timeout! Video terlalu lama diproses.")
+        safe_remove(input_path)
+        safe_remove(output_path)
+        return jsonify({"error": "Processing timeout!"}), 500
 
-    logging.info(f"FFmpeg Output:\n{result.stdout}")
-    logging.error(f"FFmpeg Error:\n{result.stderr}")
+    logging.info(f"FFmpeg Exit Code: {result.returncode}")
+    logging.debug(f"FFmpeg Output: {result.stdout}")  # Ubah ke debug agar tidak selalu tampil
+    logging.error(f"FFmpeg Error: {result.stderr}" if result.returncode != 0 else "FFmpeg berhasil!")
 
     if result.returncode != 0 or not os.path.exists(output_path) or os.stat(output_path).st_size == 0:
         logging.error("FFmpeg gagal atau output video kosong!")
