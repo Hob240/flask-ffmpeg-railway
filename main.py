@@ -46,13 +46,13 @@ def process_video():
     match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", duration_result.stderr)
     if match:
         hours, minutes, seconds = map(float, match.groups())
-        duration = hours * 3600 + minutes * 60 + seconds
+        duration = hours * 3600 + minutes * 60 + seconds - 1  
     else:
         logging.error("Gagal mendapatkan durasi video!")
         safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # 🛠️ Perbaikan FFmpeg Command (Kurangi Pemotongan)
+    # 🛠️ FFmpeg Command dengan tambahan watermark, blur random, dan noise ringan
     command = [
         ffmpeg_path, "-y",
         "-loglevel", "info",
@@ -61,17 +61,25 @@ def process_video():
         "-r", "30",
         "-vsync", "vfr",
         "-i", input_path,
-        "-ss", "0.2",  # 🔥 Hanya potong 0.2 detik di awal
-        "-t", str(duration - 0.5),  # 🔥 Hanya potong 0.5 detik di akhir
-        "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04",
+        "-t", str(duration - 1),
+        
+        # 🎨 Modifikasi visual: brightness, contrast, saturation
+        "-vf", 
+        "eq=contrast=1.02:brightness=0.02:saturation=1.04, "
+        "noise=alls=3:allf=t+u, "  # 🔥 Tambah noise ringan
+        "drawtext=text=' ':fontsize=30:fontcolor=white@0.05:x=10:y=10, "  # 🔥 Watermark sangat tipis
+        "tblend=all_mode=lighten:all_opacity=0.05",  # 🔥 Blur random di beberapa frame
+        
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "30",
         "-b:v", "1000k",
         "-pix_fmt", "yuv420p",
+
         "-c:a", "aac",
         "-b:a", "128k",
-        "-af", "asetrate=44100*1.002, atempo=0.998, volume=1.02",  # 🔥 Sedikit perubahan pada audio
+        "-af", "asetrate=44100*1.004, atempo=0.996, volume=1.02",
+
         "-strict", "-2",
         "-shortest",
         "-movflags", "+faststart",
