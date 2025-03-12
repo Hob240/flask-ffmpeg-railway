@@ -61,15 +61,19 @@ def process_video():
         "-vf", "scale=w=1280:h=720:force_original_aspect_ratio=decrease,"
                "pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
                "gblur=sigma=0.3,unsharp=5:5:0.8:5:5:0.8,"
-               "drawtext=text='CustomWatermark':x=10:y=10:fontsize=10:fontcolor=white@0.1",
+               "drawtext=text='CustomWatermark':x=10:y=10:fontsize=10:fontcolor=white@0.1,"
+               "tblend=all_mode=average,"  # Frame blending untuk mengubah frame pattern
+               "eq=contrast=1.02:brightness=0.02:saturation=0.98,"  # Sedikit tweak warna
+               "noise=alls=20:allf=t",  # Tambahkan noise agar berbeda
         "-r", "23.976",
-        "-c:v", "libx264",  # Gunakan H.264 agar kompatibel
+        "-c:v", "libx264",  # Tetap menggunakan H.264 seperti permintaanmu
         "-preset", "veryfast",
         "-crf", "26",
         "-b:v", "1000k",
         "-c:a", "aac",
         "-b:a", "128k",
-        "-af", "asetrate=44100*1.02, atempo=0.98, volume=1.03, anoise=a=pink:scale=0.02",
+        "-af", "asetrate=44100*1.02, atempo=0.98, volume=1.03, "
+               "aecho=0.8:0.88:60:0.4, aphaser",  # Tambahkan efek suara agar sulit dikenali
         "-movflags", "+faststart",
         "-map_metadata", "-1",  # Hapus metadata sepenuhnya
         "-pix_fmt", "yuv420p",
