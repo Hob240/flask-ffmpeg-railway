@@ -34,11 +34,11 @@ def process_video():
     if not ffmpeg_path:
         ffmpeg_path = "ffmpeg"
 
-    # FFmpeg Command
+    # Perbaikan Scale agar tetap menjaga Aspect Ratio
     command = [
         ffmpeg_path, "-y",
         "-i", input_path,
-        "-vf", "scale='min(1280,iw)':-2, eq=contrast=1.05:brightness=0.02:saturation=1.1, noise=alls=10:allf=t",
+        "-vf", "scale=w=1280:h=720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,eq=contrast=1.05:brightness=0.02:saturation=1.1,noise=alls=10:allf=t",
         "-r", "23.976",
         "-c:v", "libx265", "-preset", "ultrafast", "-crf", "28",
         "-b:v", "800k",
@@ -69,4 +69,3 @@ def process_video():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=True)
-
