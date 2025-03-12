@@ -57,10 +57,11 @@ def process_video():
         safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # Perbaikan: Pindahkan "-r 29.97" sebelum "-i"
+    # Perbaikan: Hilangkan metadata `creation_time`
     command = [
         ffmpeg_path, "-y",
-        "-r", "29.97",  # **Letakkan sebelum "-i" untuk menghindari error**
+        "-loglevel", "error",  # Supaya lebih mudah debug
+        "-r", "29.97",  # **Letakkan sebelum "-i"**
         "-ss", "1",  # Potong 1 detik awal
         "-i", input_path,
         "-t", str(duration - 1),  # Potong 1 detik akhir
@@ -81,7 +82,6 @@ def process_video():
         "-metadata", "title=New Video",
         "-metadata", "encoder=FFmpeg Custom",
         "-metadata", "comment=Processed by AI Pipeline",
-        "-metadata", f"creation_time=202{str(hours)[0]}-{minutes}-{int(seconds)%28+1}T{hours}:{minutes}:{int(seconds)}Z",  # Random timestamp
         output_path
     ]
 
