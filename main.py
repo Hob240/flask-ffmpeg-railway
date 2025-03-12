@@ -5,13 +5,13 @@ import tempfile
 import re
 from flask import Flask, request, send_file, jsonify
 
-# Logging
+# Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 app = Flask(__name__)
 
 def safe_remove(file_path):
-    """Menghapus file jika masih ada untuk menghindari error."""
+    """Menghapus file sementara jika masih ada."""
     try:
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -51,33 +51,33 @@ def process_video():
     
     if match:
         hours, minutes, seconds = map(float, match.groups())
-        duration = hours * 3600 + minutes * 60 + seconds - 1  # Kurangi 1 detik agar unik
+        duration = hours * 3600 + minutes * 60 + seconds - 1  # Kurangi 1 detik biar unik
     else:
         logging.error("Gagal mendapatkan durasi video!")
         safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # FFmpeg Command (Optimized)
+    # FFmpeg Command (Optimized & Fixed)
     command = [
         ffmpeg_path, "-y",
-        "-loglevel", "info",  # Tambahkan info agar bisa debugging
+        "-loglevel", "info",  # Logging tambahan
         "-hide_banner",
-        "-r", "29.97",
-        "-vsync", "2",  # Sinkronisasi FPS
-        "-ss", "1",  # Potong 1 detik awal
+        "-fflags", "+genpts",  # FIX: Perbaiki timestamp
+        "-r", "30",  # FPS tetap 30
+        "-vsync", "vfr",
         "-i", input_path,
-        "-t", str(duration - 1),  # Potong 1 detik akhir
-        "-vf", "eq=contrast=1.02:brightness=0.01:saturation=1.03",  # Efek warna agar lebih unik
+        "-t", str(duration - 1),  # Potong 1 detik akhir biar unik
+        "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04",  # Efek warna tetap
         "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "23",
-        "-b:v", "1600k",
+        "-preset", "faster",  # FIX: Encoding lebih ringan
+        "-crf", "28",  # FIX: Kurangi beban encoding
+        "-b:v", "1200k",  # Turunkan bitrate sedikit
+        "-pix_fmt", "yuv420p",
         "-c:a", "aac",
-        "-b:a", "128k",
-        "-af", "asetrate=44100*1.005, atempo=0.995, volume=1.02",  # Sedikit ubah tempo & pitch audio
+        "-b:a", "96k",  # Turunkan bitrate audio
+        "-af", "asetrate=44100*1.004, atempo=0.996, volume=1.02",  # FIX: Lebih stabil
         "-movflags", "+faststart",
         "-map_metadata", "-1",  # Hapus metadata asli
-        "-pix_fmt", "yuv420p",
         "-metadata", "title=New Video",
         "-metadata", "encoder=FFmpeg Custom",
         "-metadata", "comment=Processed by AI Pipeline",
@@ -89,10 +89,11 @@ def process_video():
     logging.info(f"FFmpeg Output:\n{result.stdout}")
     logging.error(f"FFmpeg Error:\n{result.stderr}")
 
-    if result.returncode != 0 or not os.path.exists(output_path):
+    if result.returncode != 0 or not os.path.exists(output_path) or os.stat(output_path).st_size == 0:
+        logging.error("FFmpeg gagal atau output video kosong!")
         safe_remove(input_path)
         safe_remove(output_path)
-        return jsonify({"error": "FFmpeg failed!"}), 500
+        return jsonify({"error": "FFmpeg failed or output file is empty!"}), 500
 
     response = send_file(output_path, as_attachment=True)
 
