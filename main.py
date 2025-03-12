@@ -67,7 +67,7 @@ def process_video():
         "-vsync", "vfr",
         "-i", input_path,
         "-t", str(duration),  # Gunakan durasi asli tanpa mengurangi terlalu banyak
-        
+
         # 🎨 Filter visual lebih unik
         "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04,"
                "noise=alls=5:allf=t,"
@@ -92,10 +92,15 @@ def process_video():
         "-strict", "-2",
         "-shortest",
         "-movflags", "+faststart",
-        "-map_metadata", "-1",  
-        "-metadata", "title=New Video",
-        "-metadata", "encoder=FFmpeg Custom",
-        "-metadata", "comment=Processed by AI Pipeline",
+
+        # ❌ Hapus semua metadata dan chapters
+        "-map_metadata", "-1",
+        "-map_chapters", "-1",
+        "-metadata", "title=",
+        "-metadata", "artist=",
+        "-metadata", "album=",
+        "-metadata", "comment=",
+        "-metadata", "encoder=",
         
         output_path
     ]
