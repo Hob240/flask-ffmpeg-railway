@@ -5,7 +5,6 @@ import tempfile
 import re
 from flask import Flask, request, send_file, jsonify
 
-# Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 app = Flask(__name__)
@@ -17,14 +16,6 @@ def safe_remove(file_path):
             os.remove(file_path)
     except Exception as e:
         logging.warning(f"Gagal menghapus {file_path}: {e}")
-
-def get_ffmpeg_path():
-    """Mengecek apakah FFmpeg tersedia di sistem."""
-    ffmpeg_path = subprocess.run(["which", "ffmpeg"], capture_output=True, text=True).stdout.strip()
-    if not ffmpeg_path:
-        logging.error("FFmpeg tidak ditemukan! Pastikan sudah terinstall.")
-        return None
-    return ffmpeg_path
 
 @app.route("/", methods=["GET"])
 def home():
@@ -46,10 +37,20 @@ def process_video():
 
     logging.info(f"Processing video: {input_path}")
 
-    ffmpeg_path = get_ffmpeg_path()
+    # Cek apakah FFmpeg tersedia
+    ffmpeg_path = subprocess.run(["which", "ffmpeg"], capture_output=True, text=True).stdout.strip()
     if not ffmpeg_path:
         safe_remove(input_path)
         return jsonify({"error": "FFmpeg not found!"}), 500
+
+    # Cek apakah file input valid
+    probe_cmd = [ffmpeg_path, "-v", "error", "-i", input_path, "-f", "null", "-"]
+    probe_result = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    if probe_result.returncode != 0:
+        logging.error(f"Invalid input file! FFmpeg Output:\n{probe_result.stderr}")
+        safe_remove(input_path)
+        return jsonify({"error": "Invalid video file!", "details": probe_result.stderr}), 400
 
     # Ambil durasi video
     duration_cmd = [ffmpeg_path, "-hide_banner", "-i", input_path]
@@ -66,28 +67,16 @@ def process_video():
         safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!", "details": duration_result.stderr}), 500
 
-    # Uji apakah filter tersedia
-    filter_test_cmd = [ffmpeg_path, "-hide_banner", "-filters"]
-    filter_test_result = subprocess.run(filter_test_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-    # Pastikan filter tersedia sebelum dipakai
-    required_filters = ["minterpolate", "tblend", "eq", "rotate"]
-    for filter_name in required_filters:
-        if filter_name not in filter_test_result.stdout:
-            logging.warning(f"Filter '{filter_name}' tidak tersedia. Menghapus dari pipeline.")
-    
-    # Coba tanpa minterpolate & tblend kalau error terus
-    filter_chain = "eq=contrast=1.02:brightness=0.01:saturation=1.03,rotate=0.005*sin(2*PI*t/8)"
-    
+    # Coba proses video dengan log lebih detail
     command = [
         ffmpeg_path, "-y",
-        "-loglevel", "error",
+        "-loglevel", "info",  # Ubah jadi "info" untuk lihat lebih banyak log
         "-hide_banner",
         "-r", "29.97",
         "-ss", "1",
         "-i", input_path,
         "-t", str(duration - 1),
-        "-vf", filter_chain,
+        "-vf", "eq=contrast=1.02:brightness=0.01:saturation=1.03,rotate=0.005*sin(2*PI*t/8)",
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-crf", "23",
@@ -108,8 +97,10 @@ def process_video():
 
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
+    logging.info(f"FFmpeg Output:\n{result.stdout}")
+    logging.error(f"FFmpeg Error:\n{result.stderr}")
+
     if result.returncode != 0 or not os.path.exists(output_path):
-        logging.error(f"FFmpeg Error:\n{result.stderr}")
         safe_remove(input_path)
         safe_remove(output_path)
         return jsonify({"error": "FFmpeg failed!", "details": result.stderr}), 500
