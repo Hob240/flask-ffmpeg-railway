@@ -60,10 +60,13 @@ def process_video():
         "-t", str(duration),  # Potong 0.5 detik akhir
         "-vf", "scale=w=1280:h=720:force_original_aspect_ratio=decrease,"
                "pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
-               "gblur=sigma=0.3,unsharp=3:3:0.5:3:3:0.5,"  # Tambahkan sharpening
-               "drawtext=text='CustomWatermark':x=10:y=10:fontsize=10:fontcolor=white@0.1,"
-               "tblend=all_mode=average,"  # Frame blending untuk mengubah pola frame
-               "eq=contrast=1.02:brightness=0.02:saturation=0.98",  # Sedikit tweak warna
+               "tblend=all_mode=average,"
+               "eq=contrast=1.02:brightness=0.02:saturation=0.98,"
+               "noise=c0s=1:c0f=t+u,"  # Tambahkan noise subtil
+               "mpdecimate,"  # Hilangkan beberapa frame acak
+               "shuffleframes=0 1 2 5 3 4,"  # Ubah susunan beberapa frame
+               "lutrgb=r=0.99:g=0.99:b=0.99,"  # Sedikit ubah warna RGB agar hash berubah
+               "drawtext=text='CustomWatermark':x=10:y=10:fontsize=10:fontcolor=white@0.1",
         "-r", "23.976",
         "-c:v", "libx264",  # Tetap menggunakan H.264 seperti permintaanmu
         "-preset", "veryfast",
