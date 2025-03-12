@@ -49,7 +49,7 @@ def process_video():
         os.remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # Perbaikan Scale, Encoding, Audio, dan Randomisasi agar sulit dideteksi
+    # Perbaikan Filter agar tidak jadi hijau
     command = [
         ffmpeg_path, "-y",
         "-ss", "0.5",  # Potong 0.5 detik awal
@@ -57,11 +57,9 @@ def process_video():
         "-t", str(duration),  # Potong 0.5 detik akhir
         "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
                "pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
-               "eq=contrast=1.02:brightness=0.02:saturation=0.98,"
-               "noise=alls=20:allf=t,"  # Tambahkan noise halus tanpa membuat video gelap
-               "mpdecimate,"  # Hapus frame duplikat acak
-               "lutyuv=y=0.99:u=1.01:v=1.01,"  # Modifikasi warna secara halus
-               "drawtext=text='CustomWatermark':x=10:y=10:fontsize=10:fontcolor=white@0.1",
+               "eq=contrast=1.02:brightness=0.02:saturation=1.02,"
+               "noise=alls=5:allf=t,"  # Noise halus
+               "mpdecimate",  # Hapus frame duplikat acak
         "-r", "23.976",
         "-c:v", "libx264",
         "-preset", "veryfast",
@@ -69,8 +67,7 @@ def process_video():
         "-b:v", "1000k",
         "-c:a", "aac",
         "-b:a", "128k",
-        "-af", "asetrate=44100*1.02, atempo=0.98, volume=1.03, "
-               "aecho=0.8:0.88:60:0.4, aphaser",  # Modifikasi audio
+        "-af", "asetrate=44100*1.01, atempo=0.99, volume=1.02",  # Modifikasi audio halus
         "-movflags", "+faststart",
         "-map_metadata", "-1",  # Hapus metadata sepenuhnya
         "-pix_fmt", "yuv420p",
