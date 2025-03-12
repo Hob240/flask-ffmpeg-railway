@@ -49,34 +49,38 @@ def process_video():
         os.remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # Filter agar video mirip Reels dan sulit dideteksi
+    # Buat watermark transparan kecil
+    watermark_text = "CUSTOM EDIT"
+    watermark_filter = (
+        f"drawtext=text='{watermark_text}':x=w-tw-10:y=h-th-10:fontsize=18:fontcolor=white@0.3"
+    )
+
+    # Perbaikan Filter agar tidak terdeteksi
     command = [
         ffmpeg_path, "-y",
-        "-ss", "0.5",  # Hilangkan 0.5 detik awal
+        "-ss", "1",  # Potong 1 detik awal
         "-i", input_path,
-        "-t", str(duration),  # Hilangkan 1 detik terakhir
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,"
-               "pad=1080:1920:(ow-iw)/2:(oh-ih)/2,"
-               "eq=contrast=1.05:brightness=0.03:saturation=1.08,"
-               "hue=h=2*t,"
-               "noise=alls=6:allf=t,"
-               "mpdecimate,"
-               "rotate=0.01*sin(2*PI*t/8),"  # Rotasi kecil agar unik
-               "chromashift=-2,"
-               "boxblur=1:1",
-        "-r", "30",
+        "-t", str(duration - 1),  # Potong 1 detik akhir
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,"  # Pastikan rasio tetap alami
+               "pad=1080:1920:(ow-iw)/2:(oh-ih)/2,"  # Tambahkan padding jika perlu
+               "eq=contrast=1.05:brightness=0.02:saturation=1.05,"  # Ubah sedikit brightness/kontras
+               "hue=h=2*t,"  # Perubahan warna dinamis
+               "noise=alls=6:allf=t,"  # Tambahkan noise halus
+               "tblend=all_mode=difference128,"  # Blur motion sangat kecil
+               "rotate=0.01*sin(2*PI*t/6),"  # Rotasi dinamis kecil
+               "mpdecimate,"  # Hapus frame duplikat
+               f"{watermark_filter}",  # Tambahkan watermark transparan kecil
+        "-r", "29.97",  # Gunakan FPS unik
         "-c:v", "libx264",
         "-preset", "veryfast",
-        "-crf", "22",
-        "-b:v", "3500k",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-af", "asetrate=44100*1.02, atempo=0.98, volume=1.02, "
-               "rubberband=pitch=0.99,"
-               "afftdn",
+        "-crf", "26",
+        "-b:v", "1500k",
+        "-c:a", "libopus",  # Gunakan format audio Opus
+        "-b:a", "128k",
+        "-af", "asetrate=44100*1.01, atempo=0.99, volume=1.01",  # Perubahan halus di audio
         "-movflags", "+faststart",
-        "-map_metadata", "-1",
+        "-map_metadata", "-1",  # Hapus metadata sepenuhnya
+        "-pix_fmt", "yuv420p",
         "-metadata", "title=Edited",
         "-metadata", "encoder=CustomEncoder",
         "-metadata", "comment=Processed by Custom Pipeline",
