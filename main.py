@@ -46,24 +46,24 @@ def process_video():
     match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", duration_result.stderr)
     if match:
         hours, minutes, seconds = map(float, match.groups())
-        duration = hours * 3600 + minutes * 60 + seconds - 1  
+        duration = hours * 3600 + minutes * 60 + seconds
     else:
         logging.error("Gagal mendapatkan durasi video!")
         safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # 🔥 Versi lebih sulit dideteksi Content ID
+    # 🛠️ Perbaikan FFmpeg Command (Kurangi Pemotongan)
     command = [
         ffmpeg_path, "-y",
         "-loglevel", "info",
         "-hide_banner",
         "-fflags", "+genpts",
-        "-r", "29.89",  # ✅ FPS sedikit diubah
+        "-r", "30",
         "-vsync", "vfr",
         "-i", input_path,
-        "-ss", "0.5",  # ✅ Potong sedikit di awal
-        "-t", str(duration - 1.5),  # ✅ Potong sedikit di akhir
-        "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04,noise=alls=3:allf=t,drawtext=text=' ':fontcolor=white@0.01:x=10:y=10",
+        "-ss", "0.2",  # 🔥 Hanya potong 0.2 detik di awal
+        "-t", str(duration - 0.5),  # 🔥 Hanya potong 0.5 detik di akhir
+        "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04",
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "30",
@@ -71,7 +71,7 @@ def process_video():
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "128k",
-        "-af", "asetrate=44100*1.005, atempo=0.995, volume=1.02",  # ✅ Ubah pitch audio sedikit
+        "-af", "asetrate=44100*1.002, atempo=0.998, volume=1.02",  # 🔥 Sedikit perubahan pada audio
         "-strict", "-2",
         "-shortest",
         "-movflags", "+faststart",
