@@ -52,7 +52,7 @@ def process_video():
         return jsonify({"error": "FFmpeg not found!"}), 500
 
     # Ambil durasi video
-    duration_cmd = [ffmpeg_path, "-i", input_path]
+    duration_cmd = [ffmpeg_path, "-hide_banner", "-i", input_path]
     duration_result = subprocess.run(duration_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", duration_result.stderr)
@@ -66,18 +66,28 @@ def process_video():
         safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!", "details": duration_result.stderr}), 500
 
-    # Perintah FFmpeg untuk edit video
+    # Uji apakah filter tersedia
+    filter_test_cmd = [ffmpeg_path, "-hide_banner", "-filters"]
+    filter_test_result = subprocess.run(filter_test_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    # Pastikan filter tersedia sebelum dipakai
+    required_filters = ["minterpolate", "tblend", "eq", "rotate"]
+    for filter_name in required_filters:
+        if filter_name not in filter_test_result.stdout:
+            logging.warning(f"Filter '{filter_name}' tidak tersedia. Menghapus dari pipeline.")
+    
+    # Coba tanpa minterpolate & tblend kalau error terus
+    filter_chain = "eq=contrast=1.02:brightness=0.01:saturation=1.03,rotate=0.005*sin(2*PI*t/8)"
+    
     command = [
         ffmpeg_path, "-y",
         "-loglevel", "error",
+        "-hide_banner",
         "-r", "29.97",
         "-ss", "1",
         "-i", input_path,
         "-t", str(duration - 1),
-        "-vf", "minterpolate=mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,"
-               "tblend=all_mode=difference128,"
-               "eq=contrast=1.02:brightness=0.01:saturation=1.03,"
-               "rotate=0.005*sin(2*PI*t/8)",  
+        "-vf", filter_chain,
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-crf", "23",
