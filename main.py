@@ -2,6 +2,7 @@ import os
 import subprocess
 import logging
 import tempfile
+import re
 from flask import Flask, request, send_file, jsonify
 
 # Logging
@@ -36,11 +37,20 @@ def process_video():
 
     # Ambil durasi video
     duration_cmd = [
-        ffmpeg_path, "-i", input_path, "-show_entries", "format=duration", 
-        "-v", "quiet", "-of", "csv=p=0"
+        ffmpeg_path, "-i", input_path
     ]
     duration_result = subprocess.run(duration_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    duration = float(duration_result.stdout.strip()) - 1  # Kurangi 0.5 detik dari awal & akhir
+
+    # Gunakan regex untuk mencari durasi jika metode sebelumnya gagal
+    match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", duration_result.stderr)
+    
+    if match:
+        hours, minutes, seconds = map(float, match.groups())
+        duration = hours * 3600 + minutes * 60 + seconds - 1  # Kurangi 1 detik
+    else:
+        logging.error("Gagal mendapatkan durasi video!")
+        os.remove(input_path)
+        return jsonify({"error": "Failed to get video duration!"}), 500
 
     # Perbaikan Scale, Encoding, Audio, dan Randomisasi agar sulit dideteksi
     command = [
