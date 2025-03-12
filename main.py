@@ -34,18 +34,24 @@ def process_video():
     if not ffmpeg_path:
         ffmpeg_path = "ffmpeg"
 
-    # Perbaikan Scale agar tetap menjaga Aspect Ratio
+    # Perbaikan Scale & Randomisasi Encoding agar sulit dideteksi Snapchat
     command = [
         ffmpeg_path, "-y",
         "-i", input_path,
-        "-vf", "scale=w=1280:h=720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,eq=contrast=1.05:brightness=0.02:saturation=1.1,noise=alls=10:allf=t",
+        "-vf", "scale=w=1280:h=720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,eq=contrast=1.07:brightness=0.015:saturation=1.15,noise=alls=20:allf=t",
         "-r", "23.976",
-        "-c:v", "libx265", "-preset", "ultrafast", "-crf", "28",
-        "-b:v", "800k",
-        "-c:a", "aac", "-b:a", "96k",
+        "-c:v", "libx264",  # Gunakan H.264 agar kompatibel
+        "-preset", "veryfast",
+        "-crf", "26",  # Kualitas sedikit dikompresi
+        "-b:v", "1000k",
+        "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
-        "-map_metadata", "-1",
+        "-map_metadata", "-1",  # Hapus metadata sepenuhnya
         "-pix_fmt", "yuv420p",
+        "-metadata", "title=Edited",  # Ubah metadata
+        "-metadata", "encoder=CustomEncoder",  # Buat metadata unik
+        "-metadata", "comment=Processed by Custom Pipeline",  # Tambahkan comment metadata
+        "-metadata", "creation_time=now",  # Ubah waktu pembuatan
         output_path
     ]
 
