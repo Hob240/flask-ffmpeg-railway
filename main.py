@@ -52,27 +52,28 @@ def process_video():
         safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # 🛠️ Perbaikan FFmpeg Command
+    # 🔥 Versi lebih sulit dideteksi Content ID
     command = [
         ffmpeg_path, "-y",
         "-loglevel", "info",
         "-hide_banner",
         "-fflags", "+genpts",
-        "-r", "30",
+        "-r", "29.89",  # ✅ FPS sedikit diubah
         "-vsync", "vfr",
         "-i", input_path,
-        "-t", str(duration - 1),
-        "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04",
+        "-ss", "0.5",  # ✅ Potong sedikit di awal
+        "-t", str(duration - 1.5),  # ✅ Potong sedikit di akhir
+        "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04,noise=alls=3:allf=t,drawtext=text=' ':fontcolor=white@0.01:x=10:y=10",
         "-c:v", "libx264",
-        "-preset", "ultrafast",  # 🔥 FIX: Encoding lebih cepat di Railway
-        "-crf", "30",  # 🔥 FIX: Lebih ringan daripada 28
+        "-preset", "ultrafast",
+        "-crf", "30",
         "-b:v", "1000k",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "128k",
-        "-af", "asetrate=44100*1.004, atempo=0.996, volume=1.02",
-        "-strict", "-2",  # 🔥 FIX: Audio compatibility
-        "-shortest",  # 🔥 FIX: Sinkronisasi audio & video
+        "-af", "asetrate=44100*1.005, atempo=0.995, volume=1.02",  # ✅ Ubah pitch audio sedikit
+        "-strict", "-2",
+        "-shortest",
         "-movflags", "+faststart",
         "-map_metadata", "-1",
         "-metadata", "title=New Video",
