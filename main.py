@@ -58,9 +58,9 @@ def process_video():
         "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
                "pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
                "eq=contrast=1.02:brightness=0.02:saturation=0.98,"
-               "dctdnoiz=0.5,"  # Noise halus agar hash berubah
+               "noise=alls=20:allf=t,"  # Tambahkan noise halus tanpa membuat video gelap
                "mpdecimate,"  # Hapus frame duplikat acak
-               "lutyuv=y=0.99*u=1.01*v=1.01,"  # Modifikasi warna subtil
+               "lutyuv=y=0.99:u=1.01:v=1.01,"  # Modifikasi warna secara halus
                "drawtext=text='CustomWatermark':x=10:y=10:fontsize=10:fontcolor=white@0.1",
         "-r", "23.976",
         "-c:v", "libx264",
