@@ -5,6 +5,7 @@ import tempfile
 import re
 from flask import Flask, request, send_file, jsonify
 
+# Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 app = Flask(__name__)
@@ -40,60 +41,48 @@ def process_video():
     # Cek apakah FFmpeg tersedia
     ffmpeg_path = subprocess.run(["which", "ffmpeg"], capture_output=True, text=True).stdout.strip()
     if not ffmpeg_path:
-        safe_remove(input_path)
-        return jsonify({"error": "FFmpeg not found!"}), 500
-
-    # Cek apakah file input valid
-    probe_cmd = [ffmpeg_path, "-v", "error", "-i", input_path, "-f", "null", "-"]
-    probe_result = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-    if probe_result.returncode != 0:
-        logging.error(f"Invalid input file! FFmpeg Output:\n{probe_result.stderr}")
-        safe_remove(input_path)
-        return jsonify({"error": "Invalid video file!", "details": probe_result.stderr}), 400
+        ffmpeg_path = "ffmpeg"
 
     # Ambil durasi video
-    duration_cmd = [ffmpeg_path, "-hide_banner", "-i", input_path]
+    duration_cmd = [ffmpeg_path, "-i", input_path]
     duration_result = subprocess.run(duration_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", duration_result.stderr)
     
     if match:
         hours, minutes, seconds = map(float, match.groups())
-        duration = hours * 3600 + minutes * 60 + seconds - 1
+        duration = hours * 3600 + minutes * 60 + seconds - 1  # Kurangi 1 detik agar unik
     else:
-        logging.error("Gagal mendapatkan durasi video! FFmpeg Output:")
-        logging.error(duration_result.stderr)
+        logging.error("Gagal mendapatkan durasi video!")
         safe_remove(input_path)
-        return jsonify({"error": "Failed to get video duration!", "details": duration_result.stderr}), 500
+        return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # Coba proses video dengan log lebih detail
+    # FFmpeg Command (Optimized)
     command = [
         ffmpeg_path, "-y",
-        "-loglevel", "info",  # Ubah jadi "info" untuk lihat lebih banyak log
+        "-loglevel", "info",  # Tambahkan info agar bisa debugging
         "-hide_banner",
         "-r", "29.97",
-        "-ss", "1",
+        "-vsync", "2",  # Sinkronisasi FPS
+        "-ss", "1",  # Potong 1 detik awal
         "-i", input_path,
-        "-t", str(duration - 1),
-        "-vf", "eq=contrast=1.02:brightness=0.01:saturation=1.03,rotate=0.005*sin(2*PI*t/8)",
+        "-t", str(duration - 1),  # Potong 1 detik akhir
+        "-vf", "eq=contrast=1.02:brightness=0.01:saturation=1.03",  # Efek warna agar lebih unik
         "-c:v", "libx264",
         "-preset", "veryfast",
         "-crf", "23",
         "-b:v", "1600k",
         "-c:a", "aac",
         "-b:a", "128k",
-        "-af", "asetrate=44100*1.005, atempo=0.995, volume=1.02",
+        "-af", "asetrate=44100*1.005, atempo=0.995, volume=1.02",  # Sedikit ubah tempo & pitch audio
         "-movflags", "+faststart",
-        "-map_metadata", "-1",
+        "-map_metadata", "-1",  # Hapus metadata asli
         "-pix_fmt", "yuv420p",
         "-metadata", "title=New Video",
         "-metadata", "encoder=FFmpeg Custom",
         "-metadata", "comment=Processed by AI Pipeline",
         output_path
     ]
-
-    logging.info(f"Running FFmpeg command: {' '.join(command)}")
 
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
@@ -103,7 +92,7 @@ def process_video():
     if result.returncode != 0 or not os.path.exists(output_path):
         safe_remove(input_path)
         safe_remove(output_path)
-        return jsonify({"error": "FFmpeg failed!", "details": result.stderr}), 500
+        return jsonify({"error": "FFmpeg failed!"}), 500
 
     response = send_file(output_path, as_attachment=True)
 
