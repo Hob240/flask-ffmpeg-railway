@@ -40,6 +40,7 @@ def process_video():
     if not ffmpeg_path:
         ffmpeg_path = "ffmpeg"
 
+    # 🔍 Dapatkan durasi video
     duration_cmd = [ffmpeg_path, "-i", input_path]
     duration_result = subprocess.run(duration_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
@@ -52,7 +53,7 @@ def process_video():
         safe_remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # 🛠️ FFmpeg Command dengan tambahan watermark, blur random, dan noise ringan
+    # ⚙️ Perintah FFmpeg dengan tambahan proteksi dari deteksi reupload
     command = [
         ffmpeg_path, "-y",
         "-loglevel", "info",
@@ -63,30 +64,34 @@ def process_video():
         "-i", input_path,
         "-t", str(duration - 1),
         
-        # 🎨 Modifikasi visual: brightness, contrast, saturation
-        "-vf", 
-        "eq=contrast=1.02:brightness=0.02:saturation=1.04, "
-        "noise=alls=3:allf=t+u, "  # 🔥 Tambah noise ringan
-        "drawtext=text=' ':fontsize=30:fontcolor=white@0.05:x=10:y=10, "  # 🔥 Watermark sangat tipis
-        "tblend=all_mode=lighten:all_opacity=0.05",  # 🔥 Blur random di beberapa frame
-        
+        # 🎨 Filter visual
+        "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04,"
+               "noise=alls=3:allf=t+u,"  # Noise kecil agar hash berubah
+               "tblend=all_mode=lighten:all_opacity=0.05,"  # Sedikit blur random
+               "drawtext=text=' ':fontsize=30:fontcolor=white@0.03:x=10:y=10",  # Watermark transparan sangat tipis
+
+        # 🎥 Encoding video
         "-c:v", "libx264",
+        "-profile:v", "high",  # 🔥 FIX: Ubah profile ke High
         "-preset", "ultrafast",
-        "-crf", "30",
-        "-b:v", "1000k",
+        "-crf", "28",  # 🔥 FIX: Turunkan CRF untuk mengubah lebih banyak detail
+        "-b:v", "1200k",
         "-pix_fmt", "yuv420p",
 
+        # 🔊 Audio processing
         "-c:a", "aac",
         "-b:a", "128k",
         "-af", "asetrate=44100*1.004, atempo=0.996, volume=1.02",
 
+        # 🔄 Sinkronisasi dan optimasi
         "-strict", "-2",
         "-shortest",
         "-movflags", "+faststart",
-        "-map_metadata", "-1",
+        "-map_metadata", "-1",  # 🔥 Hapus semua metadata
         "-metadata", "title=New Video",
         "-metadata", "encoder=FFmpeg Custom",
         "-metadata", "comment=Processed by AI Pipeline",
+        
         output_path
     ]
 
