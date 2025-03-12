@@ -49,42 +49,31 @@ def process_video():
         os.remove(input_path)
         return jsonify({"error": "Failed to get video duration!"}), 500
 
-    # Buat watermark transparan kecil
-    watermark_text = "CUSTOM EDIT"
-    watermark_filter = (
-        f"drawtext=text='{watermark_text}':x=w-tw-10:y=h-th-10:fontsize=18:fontcolor=white@0.3"
-    )
-
-    # Perbaikan Filter agar tidak terdeteksi
+    # Proses video dengan tweak agar sulit dideteksi
     command = [
         ffmpeg_path, "-y",
         "-ss", "1",  # Potong 1 detik awal
         "-i", input_path,
         "-t", str(duration - 1),  # Potong 1 detik akhir
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,"  # Pastikan rasio tetap alami
-               "pad=1080:1920:(ow-iw)/2:(oh-ih)/2,"  # Tambahkan padding jika perlu
-               "eq=contrast=1.05:brightness=0.02:saturation=1.05,"  # Ubah sedikit brightness/kontras
-               "hue=h=2*t,"  # Perubahan warna dinamis
-               "noise=alls=6:allf=t,"  # Tambahkan noise halus
-               "tblend=all_mode=difference128,"  # Blur motion sangat kecil
-               "rotate=0.01*sin(2*PI*t/6),"  # Rotasi dinamis kecil
-               "mpdecimate,"  # Hapus frame duplikat
-               f"{watermark_filter}",  # Tambahkan watermark transparan kecil
-        "-r", "29.97",  # Gunakan FPS unik
+        "-vf", "minterpolate=mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,"
+               "tblend=all_mode=difference128,"
+               "eq=contrast=1.02:brightness=0.01:saturation=1.03,"
+               "rotate=0.005*sin(2*PI*t/8),"  # Perubahan kecil pada rotasi
+        "-r", "29.97",  # FPS unik agar berbeda
         "-c:v", "libx264",
         "-preset", "veryfast",
-        "-crf", "26",
-        "-b:v", "1500k",
+        "-crf", "23",
+        "-b:v", "1600k",
         "-c:a", "libopus",  # Gunakan format audio Opus
         "-b:a", "128k",
-        "-af", "asetrate=44100*1.01, atempo=0.99, volume=1.01",  # Perubahan halus di audio
+        "-af", "asetrate=44100*1.005, atempo=0.995, volume=1.02",  # Sedikit mengubah tempo & pitch
         "-movflags", "+faststart",
-        "-map_metadata", "-1",  # Hapus metadata sepenuhnya
+        "-map_metadata", "-1",  # Hapus metadata asli
         "-pix_fmt", "yuv420p",
-        "-metadata", "title=Edited",
-        "-metadata", "encoder=CustomEncoder",
-        "-metadata", "comment=Processed by Custom Pipeline",
-        "-metadata", "creation_time=now",
+        "-metadata", "title=New Video",
+        "-metadata", "encoder=FFmpeg Custom",
+        "-metadata", "comment=Processed by AI Pipeline",
+        "-metadata", f"creation_time=202{str(hours)[0]}-{minutes}-{int(seconds)%28+1}T{hours}:{minutes}:{int(seconds)}Z",  # Random timestamp
         output_path
     ]
 
