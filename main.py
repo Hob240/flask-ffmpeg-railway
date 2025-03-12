@@ -5,13 +5,14 @@ import tempfile
 import re
 from flask import Flask, request, send_file, jsonify
 
-# Konfigurasi logging
+# Konfigurasi logging lebih detail
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # Maks 500MB upload
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # Maksimal upload 500MB
 
 def safe_remove(file_path):
+    """Menghapus file dengan aman"""
     try:
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -42,14 +43,15 @@ def process_video():
     if not ffmpeg_path:
         ffmpeg_path = "ffmpeg"
 
-    # 🔍 Ambil durasi video dengan cara lebih akurat
-    duration_cmd = [ffmpeg_path, "-i", input_path, "-f", "null", "-"]
-    duration_result = subprocess.run(duration_cmd, stderr=subprocess.PIPE, text=True)
+    # 🔍 Dapatkan durasi video
+    duration_cmd = [ffmpeg_path, "-i", input_path]
+    duration_result = subprocess.run(duration_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", duration_result.stderr)
     if match:
         hours, minutes, seconds = map(float, match.groups())
-        duration = hours * 3600 + minutes * 60 + seconds  # Tidak dikurangi 1 detik
+        duration = hours * 3600 + minutes * 60 + seconds - 0.5  # Mengurangi sedikit agar tidak kelebihan durasi
+        logging.info(f"Durasi asli video: {hours}:{minutes}:{seconds} (total {duration:.2f} detik)")
     else:
         logging.error("Gagal mendapatkan durasi video!")
         safe_remove(input_path)
@@ -64,32 +66,33 @@ def process_video():
         "-r", "30",
         "-vsync", "vfr",
         "-i", input_path,
-
-        # 🎨 Filter visual (diperbaiki)
+        "-t", str(duration),  # Gunakan durasi asli tanpa mengurangi terlalu banyak
+        
+        # 🎨 Filter visual lebih unik
         "-vf", "eq=contrast=1.02:brightness=0.02:saturation=1.04,"
-               "noise=alls=4:allf=t,"  # Noise lebih dinamis
-               "gblur=sigma=0.3,"  # Blur lebih halus
-               "drawtext=text='\ \ ':fontsize=30:fontcolor=white@0.02:"  # Watermark acak per frame
-               "x=rand(0\,w-50):y=rand(0\,h-50)",
+               "noise=alls=5:allf=t,"
+               "gblur=sigma=0.4,"
+               "drawtext=text='\ \ ':fontsize=30:fontcolor=white@0.02:"
+               "x=rand(0\,w-50):y=rand(0\,h-50)",  
 
         # 🎥 Encoding video
         "-c:v", "libx264",
-        "-profile:v", "high",  # 🔥 FIX: Ubah profile ke High
+        "-profile:v", "high",
         "-preset", "ultrafast",
-        "-crf", "28",  # 🔥 FIX: Turunkan CRF untuk mengubah lebih banyak detail
+        "-crf", "27",  # Lebih rendah untuk lebih banyak perubahan detail
         "-b:v", "1200k",
         "-pix_fmt", "yuv420p",
 
-        # 🔊 Audio processing (diperbaiki)
+        # 🔊 Audio processing lebih unik
         "-c:a", "aac",
         "-b:a", "128k",
-        "-af", "rubberband=pitch=1.01,volume=1.02",  # Pitch shift lebih smooth
+        "-af", "rubberband=pitch=1.015,volume=1.03",
 
         # 🔄 Sinkronisasi dan optimasi
         "-strict", "-2",
         "-shortest",
         "-movflags", "+faststart",
-        "-map_metadata", "-1",  # 🔥 Hapus semua metadata
+        "-map_metadata", "-1",  
         "-metadata", "title=New Video",
         "-metadata", "encoder=FFmpeg Custom",
         "-metadata", "comment=Processed by AI Pipeline",
@@ -106,8 +109,8 @@ def process_video():
         return jsonify({"error": "Processing timeout!"}), 500
 
     logging.info(f"FFmpeg Exit Code: {result.returncode}")
-    logging.debug(f"FFmpeg Output: {result.stdout}")  # Ubah ke debug agar tidak selalu tampil
-    logging.error(f"FFmpeg Error: {result.stderr}" if result.returncode != 0 else "FFmpeg berhasil!")
+    logging.info(f"FFmpeg Output: {result.stdout}")  
+    logging.info(f"FFmpeg Error: {result.stderr}")  
 
     if result.returncode != 0 or not os.path.exists(output_path) or os.stat(output_path).st_size == 0:
         logging.error("FFmpeg gagal atau output video kosong!")
