@@ -106,7 +106,7 @@ def process_video():
     ]
 
     try:
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1000)
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1600)
     except subprocess.TimeoutExpired:
         logging.error("FFmpeg timeout! Video terlalu lama diproses.")
         safe_remove(input_path)
